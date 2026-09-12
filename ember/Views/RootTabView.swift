@@ -11,6 +11,9 @@ struct RootTabView: View {
             HomeView()
                 .tabItem { Label("Streaks", systemImage: "flame.fill") }
 
+            EventsListView()
+                .tabItem { Label("Events", systemImage: "person.3.fill") }
+
             LeaderboardView()
                 .tabItem { Label("Leaderboard", systemImage: "trophy.fill") }
 

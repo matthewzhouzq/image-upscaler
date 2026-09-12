@@ -14,6 +14,6 @@ struct emberApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: Streak.self)
+        .modelContainer(for: [Streak.self, StreakEvent.self, EventParticipant.self, EventCheckIn.self])
     }
 }

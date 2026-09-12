@@ -18,21 +18,16 @@ struct LeaderboardRowView: View {
 
             ZStack {
                 Circle()
-                    .fill(entry.category.tint.opacity(0.16))
+                    .fill(AppTheme.flame.opacity(0.16))
                     .frame(width: 40, height: 40)
                 Text(entry.initials)
                     .font(.system(.caption, design: .rounded).weight(.bold))
-                    .foregroundStyle(entry.category.tint)
+                    .foregroundStyle(AppTheme.flame)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.displayName)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(AppTheme.textPrimary)
-                Text(entry.category.rawValue)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(AppTheme.textSecondary)
-            }
+            Text(entry.displayName)
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(AppTheme.textPrimary)
 
             Spacer()
 

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import GameKit
 import Observation
 
 @Observable
@@ -11,31 +12,45 @@ import Observation
 final class LeaderboardViewModel {
     private(set) var entries: [LeaderboardEntry] = []
     private(set) var isLoading = false
-    var selectedCategory: StreakCategory?
+    var scope: GKLeaderboard.PlayerScope = .global
 
-    private let service: LeaderboardServicing
-    private let streakRepository: StreakRepository
+    private let gameCenter: GameCenterManager
+    private let streakRepository: StreakRepository?
 
-    init(service: LeaderboardServicing, streakRepository: StreakRepository) {
-        self.service = service
+    var isAuthenticated: Bool { gameCenter.isAuthenticated }
+    var errorMessage: String? { gameCenter.lastError }
+
+    init(gameCenter: GameCenterManager, streakRepository: StreakRepository?) {
+        self.gameCenter = gameCenter
         self.streakRepository = streakRepository
     }
 
+    func signIn() {
+        if gameCenter.isAuthenticated {
+            Task { await load() }
+        } else {
+            gameCenter.authenticate()
+        }
+    }
+
+    func setScope(_ newScope: GKLeaderboard.PlayerScope) {
+        scope = newScope
+        Task { await load() }
+    }
+
     func load() async {
+        guard gameCenter.isAuthenticated else { return }
         isLoading = true
         defer { isLoading = false }
 
-        var fetched = (try? await service.fetchLeaderboard(category: selectedCategory)) ?? []
-        if let you = currentUserEntry() {
-            fetched.append(you)
+        if let bestStreak = bestLocalStreak() {
+            await gameCenter.submitScore(bestStreak)
         }
-        entries = fetched.sorted { $0.currentStreak > $1.currentStreak }
+        entries = await gameCenter.loadEntries(scope: scope)
     }
 
-    private func currentUserEntry() -> LeaderboardEntry? {
-        guard let streaks = try? streakRepository.fetchAll(), !streaks.isEmpty else { return nil }
-        let relevant = selectedCategory.map { cat in streaks.filter { $0.category == cat } } ?? streaks
-        guard let best = relevant.max(by: { $0.currentStreakCount < $1.currentStreakCount }) else { return nil }
-        return LeaderboardEntry(displayName: "You", category: best.category, currentStreak: best.currentStreakCount, isCurrentUser: true)
+    private func bestLocalStreak() -> Int? {
+        guard let streaks = try? streakRepository?.fetchAll(), !streaks.isEmpty else { return nil }
+        return streaks.map(\.currentStreakCount).max()
     }
 }

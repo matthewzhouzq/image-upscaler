@@ -9,12 +9,20 @@ private struct StreakRepositoryKey: EnvironmentKey {
     static let defaultValue: StreakRepository? = nil
 }
 
-private struct LeaderboardServiceKey: EnvironmentKey {
-    static let defaultValue: LeaderboardServicing = MockLeaderboardService()
+private struct GameCenterManagerKey: EnvironmentKey {
+    static let defaultValue = GameCenterManager()
 }
 
 private struct StreakRestoreServiceKey: EnvironmentKey {
     static let defaultValue: StreakRestoreServicing = MockStreakRestoreService()
+}
+
+private struct EventRepositoryKey: EnvironmentKey {
+    static let defaultValue: EventRepository? = nil
+}
+
+private struct PhotoStoreKey: EnvironmentKey {
+    static let defaultValue: PhotoStoring = FileSystemPhotoStore()
 }
 
 extension EnvironmentValues {
@@ -23,13 +31,23 @@ extension EnvironmentValues {
         set { self[StreakRepositoryKey.self] = newValue }
     }
 
-    var leaderboardService: LeaderboardServicing {
-        get { self[LeaderboardServiceKey.self] }
-        set { self[LeaderboardServiceKey.self] = newValue }
+    var gameCenterManager: GameCenterManager {
+        get { self[GameCenterManagerKey.self] }
+        set { self[GameCenterManagerKey.self] = newValue }
     }
 
     var streakRestoreService: StreakRestoreServicing {
         get { self[StreakRestoreServiceKey.self] }
         set { self[StreakRestoreServiceKey.self] = newValue }
+    }
+
+    var eventRepository: EventRepository? {
+        get { self[EventRepositoryKey.self] }
+        set { self[EventRepositoryKey.self] = newValue }
+    }
+
+    var photoStore: PhotoStoring {
+        get { self[PhotoStoreKey.self] }
+        set { self[PhotoStoreKey.self] = newValue }
     }
 }
