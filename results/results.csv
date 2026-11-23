@@ -1,0 +1,5 @@
+method,train_data,params,test_set,n_images,psnr,ssim,lpips,ms_per_image
+bicubic,none,0,Set5,5,28.4293,0.8111,,
+bicubic,none,0,Set14,14,26.0906,0.7048,,
+bicubic,none,0,BSD100,100,25.9614,0.6681,,
+bicubic,none,0,Urban100,100,23.1401,0.658,,
