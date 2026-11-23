@@ -17,10 +17,9 @@ def modcrop(hr: Image.Image, scale: int = SCALE) -> Image.Image:
     Why: if HR is 103 px wide, LR becomes 25 px, and 25 x 4 = 100 != 103. The metric code
     would then have to pad or resize, which shifts every pixel.
     """
-    # TODO: crop from the bottom-right, so pixel (0, 0) stays where it is.
-    # Hints: `hr.size` is (width, height), not (height, width).
-    #        `hr.crop((left, top, right, bottom))` returns a new image.
-    raise NotImplementedError
+    w, h = hr.size  # PIL gives (width, height)
+    # Trim the remainder off the right and bottom edges, so pixel (0, 0) stays where it is.
+    return hr.crop((0, 0, w - w % scale, h - h % scale))
 
 
 def bicubic_downscale(hr: Image.Image, scale: int = SCALE) -> Image.Image:
@@ -29,19 +28,20 @@ def bicubic_downscale(hr: Image.Image, scale: int = SCALE) -> Image.Image:
     Why Pillow: when shrinking, it blurs (low-pass filters) before sampling, as MATLAB's imresize does.
     torch's F.interpolate(mode="bicubic") does not unless antialias=True, and the aliasing shows up in PSNR.
     """
-    # TODO: 1. If either side isn't divisible by `scale`, raise ValueError (the caller forgot modcrop).
-    #       2. Return hr.resize((new_w, new_h), resample=Image.Resampling.BICUBIC).
-    raise NotImplementedError
+    w, h = hr.size
+    if w % scale or h % scale:
+        # Fail loudly: silently rounding here would give an LR that no longer lines up with HR.
+        raise ValueError(f"HR size {hr.size} not divisible by {scale}; call modcrop first")
+    return hr.resize((w // scale, h // scale), resample=Image.Resampling.BICUBIC)
 
 
 def make_lr_hr_pair(path: str, scale: int = SCALE) -> tuple[Image.Image, Image.Image]:
     """Load an image file and return (lr, hr), with hr already modcropped. Use this everywhere."""
-    # TODO: open the file, convert it to "RGB" (drops alpha and palettes; keeps RGB order, not BGR),
-    #       modcrop it, then downscale it.
-    raise NotImplementedError
+    # convert("RGB") drops alpha and palettes and keeps RGB order (OpenCV would give BGR).
+    hr = modcrop(Image.open(path).convert("RGB"), scale)
+    return bicubic_downscale(hr, scale), hr
 
 
 def to_float(img: Image.Image) -> np.ndarray:
     """uint8 PIL image -> float32 HxWxC array in [0, 1]. The ONE place we divide by 255."""
-    # TODO: np.asarray(...) with dtype float32, then divide by 255.
-    raise NotImplementedError
+    return np.asarray(img, dtype=np.float32) / 255.0
