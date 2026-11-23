@@ -1,0 +1,9 @@
+# Python 3.11. Phase 1 dependencies only; add more as phases need them.
+torch>=2.3
+torchvision>=0.18
+numpy>=1.26
+pillow>=10.3
+pyyaml>=6.0
+scikit-image>=0.23   # reference metrics to cross-check our own
+wandb>=0.17
+pytest>=8.0
