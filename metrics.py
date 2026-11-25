@@ -76,9 +76,47 @@ def ssim(a: np.ndarray, b: np.ndarray) -> float:
     return float(s.mean())
 
 
-def score(sr: np.ndarray, hr: np.ndarray, border: int = BORDER) -> dict[str, float]:
-    """Score one SR output against its (modcropped) HR. Both HxWx3 RGB, float [0, 1] or uint8."""
+class LPIPSMetric:
+    """LPIPS (Zhang et al. 2018) with the AlexNet backbone, the variant SR papers report. Lower is better.
+
+    PSNR rewards blur, because blur is the pixel average of every plausible texture. LPIPS compares
+    deep features calibrated against human judgments, so a sharp GAN output can lose PSNR and still
+    win here. Report both.
+    The first real use downloads the AlexNet weights through torchvision (about 230 MB).
+    `pretrained_backbone=False` uses a random backbone for tests: no download, numbers meaningless.
+    """
+
+    def __init__(self, device: str = "cpu", pretrained_backbone: bool = True) -> None:
+        import lpips
+        import torch
+
+        self._torch = torch
+        self.device = torch.device(device)
+        self.net = lpips.LPIPS(net="alex", pnet_rand=not pretrained_backbone, verbose=False).to(self.device).eval()
+
+    def _to_tensor(self, img: np.ndarray):
+        # uint8 HxWx3 RGB -> 1x3xHxW in [-1, 1], the range LPIPS was trained on.
+        t = self._torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1)[None].float()
+        return (t / 127.5 - 1.0).to(self.device)
+
+    def __call__(self, sr_u8: np.ndarray, hr_u8: np.ndarray) -> float:
+        with self._torch.no_grad():
+            return float(self.net(self._to_tensor(sr_u8), self._to_tensor(hr_u8)).item())
+
+
+def score(
+    sr: np.ndarray, hr: np.ndarray, border: int = BORDER, lpips: LPIPSMetric | None = None
+) -> dict[str, float]:
+    """Score one SR output against its (modcropped) HR. Both HxWx3 RGB, float [0, 1] or uint8.
+
+    With `lpips`, also returns "lpips", on RGB after the same clamp, rounding and border crop,
+    so all three numbers describe exactly the same pixels.
+    """
     if sr.shape != hr.shape:
         raise ValueError(f"shape mismatch: sr {sr.shape} vs hr {hr.shape} (did you modcrop HR?)")
-    y_sr, y_hr = (_crop(rgb_to_y(to_uint8(x)), border) for x in (sr, hr))
-    return {"psnr": psnr(y_sr, y_hr), "ssim": ssim(y_sr, y_hr)}
+    sr_u8, hr_u8 = to_uint8(sr), to_uint8(hr)
+    y_sr, y_hr = (_crop(rgb_to_y(x), border) for x in (sr_u8, hr_u8))
+    result = {"psnr": psnr(y_sr, y_hr), "ssim": ssim(y_sr, y_hr)}
+    if lpips is not None:
+        result["lpips"] = lpips(_crop(sr_u8, border), _crop(hr_u8, border))
+    return result
