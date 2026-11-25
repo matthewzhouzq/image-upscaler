@@ -69,11 +69,18 @@ python train.py --config configs/edsr_lite.yaml
 python eval.py --method edsr_lite --checkpoint outputs/edsr_lite/best.pt
 ```
 
-## Phase 3 — real-world degradation and GAN
+## Phase 3 — real-world degradation and GAN — code done, training pending
 
-- Second-order degradation for **training only** (blur, downsample, noise, JPEG, applied twice). Test LR for the official table still comes from `make_lr_hr_pair`. Scoring those models on a different test resize would change the contract and needs both people to agree first.
-- `models/discriminator.py`, perceptual (VGG) plus adversarial loss, weights in YAML.
-- LPIPS on RGB inside `score`, and fill the `lpips` column from here on. GAN outputs often lose a little PSNR and look sharper; report both.
+- [`data/realworld.py`](data/realworld.py): second-order degradation for **training only** (Real-ESRGAN, Wang et al. 2021). Each stage is random blur (round or rotated anisotropic Gaussian), random resize (area, bilinear or bicubic), Gaussian or Poisson noise; JPEG between the stages and at the end. The last resize lands on the exact LR grid so the ×4 output lines up with HR. Ranges in YAML, unknown keys rejected. Test LR for the official table still comes from `make_lr_hr_pair`.
+- [`models/discriminator.py`](models/discriminator.py): spectral-norm patch discriminator (a grid of real/fake logits). [`models/losses.py`](models/losses.py): VGG19 conv5_4 perceptual loss before ReLU (ESRGAN), and the standard BCE GAN losses.
+- [`train.py`](train.py) `architecture: edsr_lite_gan`: EDSR-lite generator started from `outputs/edsr_lite/best.pt`, D step on `sr.detach()`, then G step with D frozen. Loss = 1·L1 + 1·perceptual + 0.1·adversarial ([`configs/edsr_lite_gan.yaml`](configs/edsr_lite_gan.yaml)). Best checkpoint by val LPIPS, not PSNR.
+- LPIPS (AlexNet) inside `score`, on RGB after the same clamp, rounding and 4 px crop as PSNR/SSIM. `eval.py` fills the `lpips` column by default; `--no-lpips` leaves it blank. Existing rows need a re-run to get LPIPS.
+- Expect the GAN row to lose PSNR to `edsr-lite` on the bicubic test LR and win on LPIPS. Report both.
+
+```bash
+python train.py --config configs/edsr_lite_gan.yaml
+python eval.py --method edsr_lite_gan
+```
 
 ## Phase 4 — export and speed
 

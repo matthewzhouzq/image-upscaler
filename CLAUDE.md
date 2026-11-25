@@ -33,8 +33,8 @@ Tick these off as phases finish.
 This is the target layout; update it when the real structure differs.
 
 ```
-data/        # dataset classes, degradation pipeline
-models/      # srcnn.py, edsr_lite.py, discriminator.py
+data/        # dataset classes, degradation pipeline (realworld.py: training-only second-order chain)
+models/      # srcnn.py, edsr_lite.py, discriminator.py, losses.py
 classical/   # bicubic/lanczos, back-projection, TV solver (math track)
 configs/     # one YAML per experiment
 train.py     # single config-driven training script
@@ -60,6 +60,9 @@ python eval.py --method lanczos
 python eval.py --method ibp
 python eval.py --method tv
 python -m classical.wrong_blur --config configs/wrong_blur.yaml
+python train.py --config configs/edsr_lite_gan.yaml          # needs outputs/edsr_lite/best.pt first
+python eval.py --method edsr_lite_gan
+python eval.py --method bicubic --no-lpips                   # any method; skips LPIPS for a quick run
 ```
 
 ## Evaluation contract (do not change without both people agreeing)

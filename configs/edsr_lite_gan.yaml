@@ -1,0 +1,56 @@
+# EDSR-lite as a GAN generator, trained on second-order "real-world" degraded LR (Real-ESRGAN,
+# Wang et al. 2021). Loss weights follow Real-ESRGAN: pixel 1, perceptual 1, adversarial 0.1.
+# Expect LOWER PSNR than edsr-lite on the official bicubic test LR (trained for a different input,
+# and GAN textures are not pixel-exact) and a better LPIPS. Report both.
+architecture: edsr_lite_gan
+method: edsr-lite-gan
+seed: 0
+scale: 4
+patch_size: 128          # HR patch; the discriminator needs room to judge texture
+batch_size: 8
+patches_per_epoch: 8000
+epochs: 100
+num_workers: 2
+lr: 1.0e-4               # generator
+lr_d: 1.0e-4             # discriminator
+betas: [0.9, 0.99]
+loss: gan
+optimizer: adam
+train_data: DIV2K (real-world degradation)
+train_dir: datasets/DIV2K/DIV2K_train_HR
+val_dir: datasets/DIV2K/DIV2K_valid_HR
+out_dir: outputs/edsr_lite_gan
+init_from: outputs/edsr_lite/best.pt   # PSNR-trained start; set to null to start from random
+select_best_by: lpips    # psnr would pick the blurriest epoch
+device: auto
+model:                   # must match the init_from checkpoint
+  n_blocks: 8
+  n_feats: 64
+  res_scale: 0.1
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+discriminator:
+  n_feats: 64
+  n_layers: 4
+perceptual:
+  pretrained: true       # ImageNet VGG19, ~550 MB download on first run
+loss_weights:
+  pixel: 1.0
+  perceptual: 1.0
+  adversarial: 0.1
+# Training-only degradation. Omitted keys use the Real-ESRGAN defaults in data/realworld.py.
+degradation:
+  jpeg_quality: [30, 95]
+  stage1:
+    blur_prob: 1.0
+    sigma: [0.2, 3.0]
+    resize_probs: [0.2, 0.7, 0.1]   # up, down, keep
+    noise_sigma: [1.0, 30.0]
+  stage2:
+    blur_prob: 0.8
+    sigma: [0.2, 1.5]
+    resize_probs: [0.3, 0.4, 0.3]
+    noise_sigma: [1.0, 25.0]
+wandb:
+  enabled: true
+  project: image-upscaler
+  run_name: edsr-lite-gan

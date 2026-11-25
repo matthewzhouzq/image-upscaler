@@ -5,9 +5,11 @@ Usage:
     python eval.py --method bicubic --sets Set5     # just one
     python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
     python eval.py --method edsr_lite --checkpoint outputs/edsr_lite/best.pt
+    python eval.py --method edsr_lite_gan           # reads outputs/edsr_lite_gan/best.pt
     python eval.py --method lanczos                 # also: bicubic-keys, ibp, tv
 
 Writes one row per (method, test set) to results/results.csv; re-running a method replaces its rows.
+LPIPS is computed by default (AlexNet weights download on first use); --no-lpips leaves it blank.
 """
 
 from __future__ import annotations
@@ -23,15 +25,21 @@ from PIL import Image
 
 from classical.methods import CLASSICAL_NAMES, build_classical_method
 from data.degrade import SCALE, make_lr_hr_pair, to_float
-from metrics import score
+from metrics import LPIPSMetric, score
 from models.edsr_lite import load_upscaler as load_edsr
 from models.srcnn import load_upscaler
 
 TEST_SETS = ("Set5", "Set14", "BSD100", "Urban100")
-METHOD_NAMES = ("bicubic", "srcnn", "edsr_lite", *CLASSICAL_NAMES)
+METHOD_NAMES = ("bicubic", "srcnn", "edsr_lite", "edsr_lite_gan", *CLASSICAL_NAMES)
 DEFAULT_CHECKPOINTS = {
     "srcnn": Path("outputs/srcnn/best.pt"),
     "edsr_lite": Path("outputs/edsr_lite/best.pt"),
+    "edsr_lite_gan": Path("outputs/edsr_lite_gan/best.pt"),
+}
+TRAIN_CONFIGS = {
+    "srcnn": "configs/srcnn.yaml",
+    "edsr_lite": "configs/edsr_lite.yaml",
+    "edsr_lite_gan": "configs/edsr_lite_gan.yaml",
 }
 RESULTS_CSV = Path("results/results.csv")
 FIELDS = ["method", "train_data", "params", "test_set", "n_images", "psnr", "ssim", "lpips", "ms_per_image"]
@@ -70,29 +78,36 @@ def build_method(name: str, checkpoint: Path | None = None) -> Method:
         raise KeyError(name)
     path = Path(checkpoint) if checkpoint is not None else DEFAULT_CHECKPOINTS[name]
     if not path.is_file():
-        config = "configs/srcnn.yaml" if name == "srcnn" else "configs/edsr_lite.yaml"
-        raise FileNotFoundError(f"no {name} checkpoint at {path}. Train one with: python train.py --config {config}")
+        raise FileNotFoundError(
+            f"no {name} checkpoint at {path}. Train one with: python train.py --config {TRAIN_CONFIGS[name]}"
+        )
     if name == "srcnn":
         upscale, train_data, params = load_upscaler(path)
         return Method("srcnn", upscale, train_data=train_data, params=params)
+    # The GAN generator is an EDSR-lite network, so the same loader rebuilds it from the saved config.
     upscale, train_data, params, method_name = load_edsr(path)
     return Method(method_name, upscale, train_data=train_data, params=params)
 
 
-def evaluate_set(method: Method, set_dir: Path) -> dict[str, object]:
-    """Score `method` on every HR image in `set_dir`; returns one results row."""
+def evaluate_set(method: Method, set_dir: Path, lpips: LPIPSMetric | None = None) -> dict[str, object]:
+    """Score `method` on every HR image in `set_dir`; returns one results row.
+
+    Without `lpips` the column stays blank, rather than a number from a different setup.
+    """
     paths = sorted(set_dir.glob("*.png"))
     if not paths:
         raise FileNotFoundError(f"no .png images in {set_dir}")
-    psnrs, ssims = [], []
+    psnrs, ssims, lpipses = [], [], []
     for p in paths:
         lr, hr = make_lr_hr_pair(str(p))  # the one shared downscale; never build LR any other way
         sr = method.upscale(lr)
         if isinstance(sr, Image.Image):
             sr = to_float(sr)
-        s = score(sr, to_float(hr))  # clamps, rounds, Y channel, 4 px border, as the contract says
+        s = score(sr, to_float(hr), lpips=lpips)  # clamps, rounds, Y channel, 4 px border, as the contract says
         psnrs.append(s["psnr"])
         ssims.append(s["ssim"])
+        if lpips is not None:
+            lpipses.append(s["lpips"])
     return {
         "method": method.name,
         "train_data": method.train_data,
@@ -102,7 +117,7 @@ def evaluate_set(method: Method, set_dir: Path) -> dict[str, object]:
         # Mean of per-image scores: the convention papers report.
         "psnr": round(float(np.mean(psnrs)), 4),
         "ssim": round(float(np.mean(ssims)), 4),
-        "lpips": "",  # from Phase 3
+        "lpips": round(float(np.mean(lpipses)), 4) if lpipses else "",  # RGB, AlexNet, lower is better
         "ms_per_image": "",  # only from the bench/ harness, never timed here
     }
 
@@ -130,14 +145,21 @@ def main() -> None:
     parser.add_argument("--datasets", type=Path, default=Path("datasets"))
     parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=RESULTS_CSV)
+    parser.add_argument(
+        "--no-lpips", action="store_true", help="skip LPIPS (quick runs); the column is left blank, not zero"
+    )
     args = parser.parse_args()
 
     method = build_method(args.method, args.checkpoint)
+    lpips = None if args.no_lpips else LPIPSMetric()
     rows = []
     for name in args.sets:
-        row = evaluate_set(method, args.datasets / name)
+        row = evaluate_set(method, args.datasets / name, lpips=lpips)
         rows.append(row)
-        print(f"{method.name:<14s} {name:9s} n={row['n_images']:3d}  PSNR {row['psnr']:.2f} dB  SSIM {row['ssim']:.4f}")
+        extra = f"  LPIPS {row['lpips']:.4f}" if row["lpips"] != "" else ""
+        print(
+            f"{method.name:<14s} {name:9s} n={row['n_images']:3d}  PSNR {row['psnr']:.2f} dB  SSIM {row['ssim']:.4f}{extra}"
+        )
     upsert_rows(rows, args.out)
     print(f"wrote {len(rows)} rows to {args.out}")
 
