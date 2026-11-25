@@ -40,6 +40,16 @@ def test_getitem_is_deterministic_until_epoch_changes(tmp_path):
     assert not torch.equal(first, later)
 
 
+def test_lr_samples_are_the_downscale_of_the_hr_patch(tmp_path):
+    # EDSR must see the small LR. Its spatial size is the HR patch divided by 4.
+    data = SRPatchDataset(
+        _write_images(tmp_path / "hr"), patch_size=32, patches_per_epoch=1, augment=False, seed=0, samples="lr"
+    )
+    lr, hr = data[0]
+    assert hr.shape == (3, 32, 32)
+    assert lr.shape == (3, 8, 8)
+
+
 def test_flat_color_stays_flat(tmp_path):
     folder = tmp_path / "hr"
     folder.mkdir()

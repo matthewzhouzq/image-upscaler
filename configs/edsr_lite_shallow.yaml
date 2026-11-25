@@ -1,0 +1,28 @@
+# Depth ablation: 4 residual blocks instead of 8. Everything else matches configs/edsr_lite.yaml.
+architecture: edsr_lite
+method: edsr-lite-shallow
+seed: 0
+scale: 4
+patch_size: 48
+batch_size: 16
+patches_per_epoch: 8000
+epochs: 100
+num_workers: 2
+lr: 1.0e-4
+betas: [0.9, 0.999]
+loss: l1
+optimizer: adam
+train_data: DIV2K
+train_dir: datasets/DIV2K/DIV2K_train_HR
+val_dir: datasets/DIV2K/DIV2K_valid_HR
+out_dir: outputs/edsr_lite_shallow
+device: auto
+model:
+  n_blocks: 4
+  n_feats: 64
+  res_scale: 0.1
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+wandb:
+  enabled: true
+  project: image-upscaler
+  run_name: edsr-lite-shallow

@@ -1,0 +1,31 @@
+# EDSR-lite. Lim et al., CVPRW 2017: residual blocks, no batch norm, L1, Adam at 1e-4.
+# Their baseline (16 blocks, 64 features) is about 32.5 dB on Set5 ×4. This is 8 blocks,
+# so it should land above SRCNN and short of that number.
+architecture: edsr_lite
+method: edsr-lite
+seed: 0
+scale: 4
+patch_size: 48
+batch_size: 16
+patches_per_epoch: 8000
+epochs: 100
+num_workers: 2
+lr: 1.0e-4
+betas: [0.9, 0.999]
+loss: l1
+optimizer: adam
+train_data: DIV2K
+train_dir: datasets/DIV2K/DIV2K_train_HR
+val_dir: datasets/DIV2K/DIV2K_valid_HR
+out_dir: outputs/edsr_lite
+device: auto
+model:
+  n_blocks: 8
+  n_feats: 64
+  res_scale: 0.1
+  # DIV2K RGB mean. Subtracted in the network so the residual body is not learning the average color.
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+wandb:
+  enabled: true
+  project: image-upscaler
+  run_name: edsr-lite

@@ -58,11 +58,16 @@ python eval.py --method tv
 python -m classical.wrong_blur --config configs/wrong_blur.yaml
 ```
 
-## Phase 2 — EDSR-lite (parallel with 1.5)
+## Phase 2 — EDSR-lite — done
 
-- `models/edsr_lite.py`: residual blocks (conv, ReLU, conv, plus a scaled skip) and a pixel-shuffle head. Pixel shuffle is why it is cheaper than SRCNN: it learns the ×4 upsample in channels and rearranges them into space, instead of running convs on an already-upsampled image.
-- Loss is L1. `configs/` holds the ablations (depth, width, L1 vs L2), one YAML each, same `train.py`.
-- A small EDSR will not match the full EDSR Set5 number (~32.5 dB). Expect it a step above SRCNN; say so in the table notes.
+- [`models/edsr_lite.py`](models/edsr_lite.py): residual blocks (conv, ReLU, conv, scaled skip, no batch norm) and a pixel-shuffle head. Two ×2 shuffles make ×4. The convolutions stay on the small LR image; SRCNN runs them on the bicubic upsample instead. The main net is 8 blocks × 64 features, 926,723 parameters.
+- Loss is L1, Adam, RGB. The same [`train.py`](train.py) reads `architecture`. Ablations, one YAML each: [`configs/edsr_lite_shallow.yaml`](configs/edsr_lite_shallow.yaml) (4 blocks), [`configs/edsr_lite_narrow.yaml`](configs/edsr_lite_narrow.yaml) (32 features), [`configs/edsr_lite_l2.yaml`](configs/edsr_lite_l2.yaml) (MSE).
+- A full EDSR baseline is about 32.5 dB on Set5 ×4 (Lim et al., CVPRW 2017, 16 blocks). This lite model should land above SRCNN and short of that. The results row is written by eval after training; the checkpoint's `method` field keeps the ablations from overwriting each other.
+
+```bash
+python train.py --config configs/edsr_lite.yaml
+python eval.py --method edsr_lite --checkpoint outputs/edsr_lite/best.pt
+```
 
 ## Phase 3 — real-world degradation and GAN
 
