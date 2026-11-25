@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Datasets, checkpoints, large outputs: these live on Drive / HF Hub, never in git
+datasets/
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.onnx
+*.engine
+outputs/
+runs/
+wandb/
+
+# Small README crops in results/samples/ are allowed; other images are not
+results/**/*.png
+!results/samples/*.png
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

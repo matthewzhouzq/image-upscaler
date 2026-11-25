@@ -1,0 +1,29 @@
+# SRCNN, Dong et al. TPAMI 2016: MSE, SGD, last layer at 1e-4 and the earlier layers at 1e-5.
+# Their Set5 ×4 number is about 30.5 dB on a different training set and a much longer run.
+# DIV2K should land above bicubic (~28.4 dB on Set5) and near that figure, not on it.
+seed: 0
+scale: 4
+patch_size: 33
+batch_size: 128
+patches_per_epoch: 16000
+epochs: 100
+num_workers: 2
+lr_early: 1.0e-5
+lr_last: 1.0e-4
+momentum: 0.9
+loss: mse
+optimizer: sgd
+train_data: DIV2K
+# Official DIV2K HR folders, unzipped under datasets/ (gitignored).
+train_dir: datasets/DIV2K/DIV2K_train_HR
+val_dir: datasets/DIV2K/DIV2K_valid_HR
+out_dir: outputs/srcnn
+device: auto
+model:
+  channels: [64, 32]
+  kernels: [9, 5, 5]
+  init_std: 0.001
+wandb:
+  enabled: true
+  project: image-upscaler
+  run_name: srcnn
