@@ -4,6 +4,7 @@ Usage:
     python eval.py --method bicubic                 # all four test sets
     python eval.py --method bicubic --sets Set5     # just one
     python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
+    python eval.py --method edsr_lite --checkpoint outputs/edsr_lite/best.pt
     python eval.py --method lanczos                 # also: bicubic-keys, ibp, tv
 
 Writes one row per (method, test set) to results/results.csv; re-running a method replaces its rows.
@@ -23,10 +24,15 @@ from PIL import Image
 from classical.methods import CLASSICAL_NAMES, build_classical_method
 from data.degrade import SCALE, make_lr_hr_pair, to_float
 from metrics import score
+from models.edsr_lite import load_upscaler as load_edsr
 from models.srcnn import load_upscaler
 
 TEST_SETS = ("Set5", "Set14", "BSD100", "Urban100")
-METHOD_NAMES = ("bicubic", "srcnn", *CLASSICAL_NAMES)
+METHOD_NAMES = ("bicubic", "srcnn", "edsr_lite", *CLASSICAL_NAMES)
+DEFAULT_CHECKPOINTS = {
+    "srcnn": Path("outputs/srcnn/best.pt"),
+    "edsr_lite": Path("outputs/edsr_lite/best.pt"),
+}
 RESULTS_CSV = Path("results/results.csv")
 FIELDS = ["method", "train_data", "params", "test_set", "n_images", "psnr", "ssim", "lpips", "ms_per_image"]
 
@@ -55,20 +61,22 @@ METHODS: dict[str, Method] = {
 
 
 def build_method(name: str, checkpoint: Path | None = None) -> Method:
-    """Bicubic needs no weights. SRCNN reads its checkpoint so the row records the trained net."""
+    """Bicubic needs no weights. Learned methods read a checkpoint so the row records that net."""
     if name == "bicubic":
         return METHODS["bicubic"]
     if name in CLASSICAL_NAMES:
         return build_classical_method(name)
-    if name != "srcnn":
+    if name not in DEFAULT_CHECKPOINTS:
         raise KeyError(name)
-    path = Path(checkpoint) if checkpoint is not None else Path("outputs/srcnn/best.pt")
+    path = Path(checkpoint) if checkpoint is not None else DEFAULT_CHECKPOINTS[name]
     if not path.is_file():
-        raise FileNotFoundError(
-            f"no SRCNN checkpoint at {path}. Train one with: python train.py --config configs/srcnn.yaml"
-        )
-    upscale, train_data, params = load_upscaler(path)
-    return Method("srcnn", upscale, train_data=train_data, params=params)
+        config = "configs/srcnn.yaml" if name == "srcnn" else "configs/edsr_lite.yaml"
+        raise FileNotFoundError(f"no {name} checkpoint at {path}. Train one with: python train.py --config {config}")
+    if name == "srcnn":
+        upscale, train_data, params = load_upscaler(path)
+        return Method("srcnn", upscale, train_data=train_data, params=params)
+    upscale, train_data, params, method_name = load_edsr(path)
+    return Method(method_name, upscale, train_data=train_data, params=params)
 
 
 def evaluate_set(method: Method, set_dir: Path) -> dict[str, object]:
@@ -120,7 +128,7 @@ def main() -> None:
     parser.add_argument("--method", required=True, choices=METHOD_NAMES)
     parser.add_argument("--sets", nargs="+", default=list(TEST_SETS), choices=TEST_SETS)
     parser.add_argument("--datasets", type=Path, default=Path("datasets"))
-    parser.add_argument("--checkpoint", type=Path, default=Path("outputs/srcnn/best.pt"))
+    parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=RESULTS_CSV)
     args = parser.parse_args()
 

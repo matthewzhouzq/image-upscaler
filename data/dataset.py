@@ -64,11 +64,19 @@ class SRPatchDataset(Dataset):
         scale: int = SCALE,
         augment: bool = True,
         seed: int = 0,
+        samples: str = "bicubic",
     ) -> None:
         if scale != SCALE:
             raise ValueError(f"scale must be {SCALE}")
         if patch_size < scale:
             raise ValueError(f"patch_size {patch_size} is smaller than scale {scale}")
+        if samples not in ("bicubic", "lr"):
+            raise ValueError(f"samples must be 'bicubic' or 'lr', got {samples!r}")
+        if samples == "lr" and patch_size % scale != 0:
+            raise ValueError(
+                f"patch_size {patch_size} must be divisible by {scale} when samples='lr', "
+                "so the downscale lands on whole pixels"
+            )
         self.hr_dir = Path(hr_dir)
         self.paths = sorted(self.hr_dir.glob("*.png"))
         if not self.paths:
@@ -79,6 +87,7 @@ class SRPatchDataset(Dataset):
         self.augment = augment
         self.seed = seed
         self.epoch = 0
+        self.samples = samples
 
     def set_epoch(self, epoch: int) -> None:
         """Mix the epoch into the crop seed so the next epoch is not a replay of this one."""
@@ -94,10 +103,12 @@ class SRPatchDataset(Dataset):
         return np.random.default_rng(sequence)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return (bicubic, hr) at HR resolution, each CHW float in [0, 1].
+        """Return (input, hr). Both are CHW float in [0, 1].
 
-        SRCNN does not see the small LR. It sees the bicubic upsample, then learns the residual
-        detail the upsample missed. The upsample is Pillow bicubic, same as the baseline in eval.
+        `samples='bicubic'` is the SRCNN pair: the input is already upsampled, so every convolution
+        runs on the HR grid. `samples='lr'` is the EDSR pair: the input is the shared bicubic
+        downscale of this exact HR patch. Cropping a larger downscale instead would shift the pixels
+        the loss compares.
         """
         rng = self._rng(index)
         path = self.paths[int(rng.integers(0, len(self.paths)))]
@@ -115,6 +126,11 @@ class SRPatchDataset(Dataset):
         hr = hr.crop((left, top, left + window, top + window))
         if self.augment:
             hr = _augment(hr, rng)
+        if self.samples == "lr":
+            offset = (window - self.patch_size) // 2
+            if offset:
+                hr = hr.crop((offset, offset, offset + self.patch_size, offset + self.patch_size))
+            return pil_to_tensor(bicubic_downscale(hr, self.scale)), pil_to_tensor(hr)
         lr = bicubic_downscale(hr, self.scale)
         bicubic = lr.resize(hr.size, resample=Image.Resampling.BICUBIC)
         offset = (window - self.patch_size) // 2
