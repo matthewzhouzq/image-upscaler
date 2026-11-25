@@ -47,3 +47,22 @@ def test_upsert_replaces_instead_of_duplicating(tmp_path):
     upsert_rows([{**row, "test_set": "Set14"}], out)
     rows = list(csv.DictReader(out.open()))
     assert [(r["test_set"], r["psnr"]) for r in rows] == [("Set5", "2.0"), ("Set14", "1.0")]
+
+
+def test_no_lpips_quick_run_never_blanks_saved_lpips(tmp_path, monkeypatch):
+    # upsert_rows replaces whole rows, so a --no-lpips run that wrote would erase LPIPS from a full run.
+    import sys
+
+    import eval as eval_script
+
+    (tmp_path / "Set5").mkdir()
+    Image.fromarray(np.full((32, 32, 3), 90, np.uint8)).save(tmp_path / "Set5" / "a.png")
+    out = tmp_path / "results.csv"
+    saved = {"method": "bicubic", "train_data": "none", "params": 0, "test_set": "Set5",
+             "n_images": 1, "psnr": 30.0, "ssim": 0.9, "lpips": 0.1234, "ms_per_image": ""}
+    upsert_rows([saved], out)
+    before = out.read_text()
+    argv = ["eval.py", "--method", "bicubic", "--sets", "Set5", "--datasets", str(tmp_path), "--out", str(out), "--no-lpips"]
+    monkeypatch.setattr(sys, "argv", argv)
+    eval_script.main()
+    assert out.read_text() == before

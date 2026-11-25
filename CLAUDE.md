@@ -62,7 +62,7 @@ python eval.py --method tv
 python -m classical.wrong_blur --config configs/wrong_blur.yaml
 python train.py --config configs/edsr_lite_gan.yaml          # needs outputs/edsr_lite/best.pt first
 python eval.py --method edsr_lite_gan
-python eval.py --method bicubic --no-lpips                   # any method; skips LPIPS for a quick run
+python eval.py --method bicubic --no-lpips                   # any method; quick look, prints only, writes nothing
 ```
 
 ## Evaluation contract (do not change without both people agreeing)
@@ -73,7 +73,7 @@ Every method — math or ML — is scored by `eval.py` on the same data, so resu
 - LR inputs are made from HR images with **one shared bicubic downscale function** (in `data/`). Never use a different resize for test inputs.
 - Before scoring, outputs are **clamped to [0, 1] and rounded to uint8**.
 - **PSNR and SSIM on the Y channel** (YCbCr), with a **4-pixel border cropped**. This is the convention papers use.
-- **LPIPS** on RGB, from Phase 3 on.
+- **LPIPS** on RGB, from Phase 3 on: AlexNet backbone (`lpips` package), on the same clamped, uint8-rounded images scaled to [−1, 1], with the **same 4-pixel border crop** as PSNR/SSIM, so all three numbers describe the same pixels. Papers differ on cropping for LPIPS; this is our choice. Mean of per-image values, like PSNR/SSIM.
 - Test sets: **Set5, Set14, BSD100, Urban100**; DIV2K valid for validation during training.
 - Every method returns a row in `results/` with: method, training data, parameter count, PSNR, SSIM, LPIPS, time per image (ms).
 - Speed numbers come from the shared harness in `bench/` only: warm-up runs, `torch.cuda.synchronize()`, median of 100 runs, fixed 256×256 LR input.

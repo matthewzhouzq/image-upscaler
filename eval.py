@@ -9,7 +9,8 @@ Usage:
     python eval.py --method lanczos                 # also: bicubic-keys, ibp, tv
 
 Writes one row per (method, test set) to results/results.csv; re-running a method replaces its rows.
-LPIPS is computed by default (AlexNet weights download on first use); --no-lpips leaves it blank.
+LPIPS is computed by default (AlexNet weights download on first use); --no-lpips is a print-only
+quick look that writes nothing.
 """
 
 from __future__ import annotations
@@ -146,7 +147,9 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=RESULTS_CSV)
     parser.add_argument(
-        "--no-lpips", action="store_true", help="skip LPIPS (quick runs); the column is left blank, not zero"
+        "--no-lpips",
+        action="store_true",
+        help="quick look: skip LPIPS and print only. Nothing is written, so a saved LPIPS is never blanked",
     )
     args = parser.parse_args()
 
@@ -160,6 +163,11 @@ def main() -> None:
         print(
             f"{method.name:<14s} {name:9s} n={row['n_images']:3d}  PSNR {row['psnr']:.2f} dB  SSIM {row['ssim']:.4f}{extra}"
         )
+    if args.no_lpips:
+        # upsert_rows replaces whole rows, so writing here would blank an LPIPS saved by a full run.
+        # Keeping the old LPIPS instead could pair it with a PSNR from a different checkpoint.
+        print(f"--no-lpips: printed only, {args.out} left unchanged")
+        return
     upsert_rows(rows, args.out)
     print(f"wrote {len(rows)} rows to {args.out}")
 
