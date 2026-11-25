@@ -3,6 +3,7 @@
 Usage:
     python eval.py --method bicubic                 # all four test sets
     python eval.py --method bicubic --sets Set5     # just one
+    python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
 
 Writes one row per (method, test set) to results/results.csv; re-running a method replaces its rows.
 """
@@ -20,8 +21,10 @@ from PIL import Image
 
 from data.degrade import SCALE, make_lr_hr_pair, to_float
 from metrics import score
+from models.srcnn import load_upscaler
 
 TEST_SETS = ("Set5", "Set14", "BSD100", "Urban100")
+METHOD_NAMES = ("bicubic", "srcnn")
 RESULTS_CSV = Path("results/results.csv")
 FIELDS = ["method", "train_data", "params", "test_set", "n_images", "psnr", "ssim", "lpips", "ms_per_image"]
 
@@ -47,6 +50,21 @@ def _bicubic(lr: Image.Image) -> Image.Image:
 METHODS: dict[str, Method] = {
     "bicubic": Method("bicubic", _bicubic),
 }
+
+
+def build_method(name: str, checkpoint: Path | None = None) -> Method:
+    """Bicubic needs no weights. SRCNN reads its checkpoint so the row records the trained net."""
+    if name == "bicubic":
+        return METHODS["bicubic"]
+    if name != "srcnn":
+        raise KeyError(name)
+    path = Path(checkpoint) if checkpoint is not None else Path("outputs/srcnn/best.pt")
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"no SRCNN checkpoint at {path}. Train one with: python train.py --config configs/srcnn.yaml"
+        )
+    upscale, train_data, params = load_upscaler(path)
+    return Method("srcnn", upscale, train_data=train_data, params=params)
 
 
 def evaluate_set(method: Method, set_dir: Path) -> dict[str, object]:
@@ -95,13 +113,14 @@ def upsert_rows(rows: list[dict[str, object]], csv_path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--method", required=True, choices=sorted(METHODS))
+    parser.add_argument("--method", required=True, choices=METHOD_NAMES)
     parser.add_argument("--sets", nargs="+", default=list(TEST_SETS), choices=TEST_SETS)
     parser.add_argument("--datasets", type=Path, default=Path("datasets"))
+    parser.add_argument("--checkpoint", type=Path, default=Path("outputs/srcnn/best.pt"))
     parser.add_argument("--out", type=Path, default=RESULTS_CSV)
     args = parser.parse_args()
 
-    method = METHODS[args.method]
+    method = build_method(args.method, args.checkpoint)
     rows = []
     for name in args.sets:
         row = evaluate_set(method, args.datasets / name)

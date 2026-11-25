@@ -28,15 +28,18 @@ flowchart TD
 - Contract metrics in [`metrics.py`](metrics.py), with a scikit-image SSIM cross-check.
 - [`eval.py`](eval.py) plus bicubic rows in [`results/results.csv`](results/results.csv) (Set5 28.43 dB, in line with published ×4 bicubic).
 
-## Phase 1 — SRCNN baseline
+## Phase 1 — SRCNN baseline — done
 
-Remaining pieces, one PR:
+- [`data/dataset.py`](data/dataset.py): DIV2K train patches. Modcrop, random crop, LR via `bicubic_downscale` (never a second resizer), flips and 90° rotations. The paper's 33 px patch is the center of a slightly larger crop, because 33 is not divisible by 4. DIV2K valid is the training-time check; Set5/14, BSD100, Urban100 are eval-only.
+- [`models/srcnn.py`](models/srcnn.py): bicubic-upsample, then three convs (9×9 → 64, 5×5 → 32, 5×5 → 1) with ReLU on the first two. Train and run on the Y channel; Cb and Cr come from the bicubic upsample. Kernels are valid, with a reflect pad so the output stays the same size as HR.
+- [`configs/srcnn.yaml`](configs/srcnn.yaml): MSE, SGD, 1e-4 on the last layer and 1e-5 on the earlier ones. Seed logged.
+- [`train.py`](train.py): config-driven loop, `model.train()` / `model.eval()`, `torch.no_grad()` for val, checkpoints under `outputs/` (gitignored), runs to the shared W&B project.
+- `srcnn` is registered in [`eval.py`](eval.py). A DIV2K-trained 9-5-5 net should land above the bicubic 28.4 dB on Set5; the TPAMI 2016 figure is about 30.5 dB, and a different training set will not match that exactly. The results row is written by the eval command below once DIV2K and the test sets are on disk (they stay out of git).
 
-- `data/dataset.py`: DIV2K train patches. Modcrop, random HR crop divisible by 4, LR via `bicubic_downscale` (never a second resizer), flips and 90° rotations. DIV2K valid is the training-time check; Set5/14, BSD100, Urban100 are eval-only.
-- `models/srcnn.py`: the paper pipeline. Bicubic-upsample the LR to HR size, then three convs (9×9 → 64, 5×5 → 32, 5×5 → 1) with ReLU on the first two. Train and run on the Y channel; Cb and Cr come from the bicubic upsample. Mixing that up (RGB in, Y weights, or OpenCV BGR) silently wrecks PSNR.
-- `configs/srcnn.yaml`: the only place hyperparameters live. First config follows Dong et al.: MSE, the two learning rates (1e-4 last layer, 1e-5 earlier). Seed logged.
-- `train.py`: one config-driven loop. `model.train()` / `model.eval()`, `torch.no_grad()` for val, checkpoints under `outputs/` (gitignored), runs to the shared W&B project.
-- Register `srcnn` on `Method` in [`eval.py`](eval.py) and append rows. A DIV2K-trained 9-5-5 net should land a bit above the bicubic 28.4 dB on Set5; the TPAMI 2016 figure is about 30.5 dB, and a different training set will not match that exactly.
+```bash
+python train.py --config configs/srcnn.yaml
+python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
+```
 
 ## Phase 1.5 — pure math (parallel with Phase 2)
 
