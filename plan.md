@@ -41,14 +41,22 @@ python train.py --config configs/srcnn.yaml
 python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
 ```
 
-## Phase 1.5 — pure math (parallel with Phase 2)
+## Phase 1.5 — pure math — done
 
-Own implementations under `classical/`, each a `Method` with `params=0` and `train_data=none`:
+Own implementations under [`classical/`](classical/), each a `Method` with `params=0` and `train_data=none`. Keys bicubic and Lanczos-3 match Pillow's BICUBIC and LANCZOS on the same pixel grid.
 
-- Bicubic and Lanczos kernels written out, so the result can be compared to Pillow rather than wrapped.
-- Iterative back-projection: upsample, blur, subtract the residual, repeat.
-- TV-regularized reconstruction: data term plus total variation, solved by a small iterative method (Chambolle or a primal-dual step). Explain the energy before the solver.
-- Wrong-blur experiment: build the LR with one Gaussian, reconstruct assuming another, and record the PSNR drop in `results/`. This is a separate row, not a change to `make_lr_hr_pair`.
+- [`classical/resize.py`](classical/resize.py): the cubic and Lanczos kernels, separable, written out.
+- [`classical/ibp.py`](classical/ibp.py): upsample, subtract the residual against the shared Pillow bicubic downscale, repeat. The step is damped (`configs/ibp.yaml`) because Lanczos is not that cubic's inverse. On an edge it gains PSNR; on a smooth ramp the plain Keys upsample can still win.
+- [`classical/tv.py`](classical/tv.py): minimize `1/2 ||A x - y||^2 + λ TV(x)`, where A is a Gaussian blur and ×4 subsample. Linearized Chambolle-Pock. The blur is circular so the adjoint is exact. This inverts a Gaussian, not the bicubic test degradation, so the official `tv` row can lose to bicubic. That is the model, not a bug in `score`.
+- [`classical/wrong_blur.py`](classical/wrong_blur.py): LR from one Gaussian, TV solved at that sigma and at another. Rows are `tv-matched-blur` and `tv-wrong-blur`, not a change to `make_lr_hr_pair`. On a striped 64 px image the matched sigma leads by about 0.4 dB after 40 iterations; that gap is from this synthetic check, not from Set5.
+
+```bash
+python eval.py --method bicubic-keys
+python eval.py --method lanczos
+python eval.py --method ibp
+python eval.py --method tv
+python -m classical.wrong_blur --config configs/wrong_blur.yaml
+```
 
 ## Phase 2 — EDSR-lite (parallel with 1.5)
 
