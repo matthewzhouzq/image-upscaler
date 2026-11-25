@@ -1,0 +1,7 @@
+# Gaussian blur in high-resolution pixels, then ×4 subsample. Not the bicubic used for the
+# official test inputs: this row inverts a Gaussian. tau * sigma_dual must stay under 1/8.
+iterations: 25
+lambda: 0.002
+tau: 0.2
+sigma_dual: 0.4
+blur_sigma: 1.5

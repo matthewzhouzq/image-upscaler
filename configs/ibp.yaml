@@ -1,0 +1,7 @@
+# Back-project with our Lanczos kernel. The forward model is Pillow bicubic (see classical/ibp.py).
+# step is small because Lanczos is not the inverse of that cubic: a full step rings on smooth ramps.
+# On an edge, 8 damped steps still raise PSNR over the Lanczos upsample alone.
+iterations: 8
+step: 0.2
+upsample: lanczos
+lobes: 3

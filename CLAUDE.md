@@ -19,7 +19,7 @@ The goal is a portfolio-quality repo: real numbers, honest comparisons, and a RE
 ## Phases
 
 - [x] **1 – SRCNN baseline**: dataset class, bicubic baseline, SRCNN, training loop, `eval.py`
-- [ ] **1.5 – Pure-math track**: own bicubic/Lanczos, back-projection, TV optimization, wrong-blur experiment
+- [x] **1.5 – Pure-math track**: own bicubic/Lanczos, back-projection, TV optimization, wrong-blur experiment
 - [ ] **2 – EDSR-lite**: residual blocks, pixel shuffle, L1 loss, ablations
 - [ ] **3 – Real-world + GAN**: second-order degradation pipeline, perceptual + adversarial loss, LPIPS
 - [ ] **4 – Export + optimize**: ONNX, TensorRT FP16/INT8, speed-vs-quality table
@@ -53,6 +53,11 @@ Commands, from the repo root. Don't assume a command works until it's listed.
 python train.py --config configs/srcnn.yaml
 python eval.py --method bicubic
 python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
+python eval.py --method bicubic-keys
+python eval.py --method lanczos
+python eval.py --method ibp
+python eval.py --method tv
+python -m classical.wrong_blur --config configs/wrong_blur.yaml
 ```
 
 ## Evaluation contract (do not change without both people agreeing)

@@ -1,0 +1,3 @@
+# Keys cubic, a = -0.5 (Catmull-Rom). This is the cubic Pillow calls BICUBIC.
+a: -0.5
+support: 2

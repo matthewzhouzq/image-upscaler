@@ -1,0 +1,11 @@
+# Outside the official table. LR is Gaussian(sigma_true); TV is solved at that sigma and at sigma_assumed.
+sigma_true: 2.0
+sigma_assumed: 0.8
+# 40 iterations is enough for the wrong sigma to fall behind. More widens the gap and costs time.
+iterations: 40
+lambda: 0.001
+tau: 0.2
+sigma_dual: 0.4
+datasets: datasets
+sets: [Set5, Set14, BSD100, Urban100]
+out: results/results.csv
