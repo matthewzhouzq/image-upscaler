@@ -4,6 +4,7 @@ Usage:
     python eval.py --method bicubic                 # all four test sets
     python eval.py --method bicubic --sets Set5     # just one
     python eval.py --method srcnn --checkpoint outputs/srcnn/best.pt
+    python eval.py --method lanczos                 # also: bicubic-keys, ibp, tv
 
 Writes one row per (method, test set) to results/results.csv; re-running a method replaces its rows.
 """
@@ -19,12 +20,13 @@ from typing import Callable
 import numpy as np
 from PIL import Image
 
+from classical.methods import CLASSICAL_NAMES, build_classical_method
 from data.degrade import SCALE, make_lr_hr_pair, to_float
 from metrics import score
 from models.srcnn import load_upscaler
 
 TEST_SETS = ("Set5", "Set14", "BSD100", "Urban100")
-METHOD_NAMES = ("bicubic", "srcnn")
+METHOD_NAMES = ("bicubic", "srcnn", *CLASSICAL_NAMES)
 RESULTS_CSV = Path("results/results.csv")
 FIELDS = ["method", "train_data", "params", "test_set", "n_images", "psnr", "ssim", "lpips", "ms_per_image"]
 
@@ -56,6 +58,8 @@ def build_method(name: str, checkpoint: Path | None = None) -> Method:
     """Bicubic needs no weights. SRCNN reads its checkpoint so the row records the trained net."""
     if name == "bicubic":
         return METHODS["bicubic"]
+    if name in CLASSICAL_NAMES:
+        return build_classical_method(name)
     if name != "srcnn":
         raise KeyError(name)
     path = Path(checkpoint) if checkpoint is not None else Path("outputs/srcnn/best.pt")
@@ -125,7 +129,7 @@ def main() -> None:
     for name in args.sets:
         row = evaluate_set(method, args.datasets / name)
         rows.append(row)
-        print(f"{method.name:10s} {name:9s} n={row['n_images']:3d}  PSNR {row['psnr']:.2f} dB  SSIM {row['ssim']:.4f}")
+        print(f"{method.name:<14s} {name:9s} n={row['n_images']:3d}  PSNR {row['psnr']:.2f} dB  SSIM {row['ssim']:.4f}")
     upsert_rows(rows, args.out)
     print(f"wrote {len(rows)} rows to {args.out}")
 
